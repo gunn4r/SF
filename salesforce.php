@@ -16,7 +16,7 @@ function arraywrapper($array){
 		
 date_default_timezone_set('America/Denver'); //Set default timezone
 		
-$startdate = date('c', strtotime('2011-01-01')); // 1/1/2011 date in unix time format and sets as default start date.
+$startdate = date('c', '1/1/2011'); // 1/1/2011 date in unix time format and sets as default start date.
 $enddate = date('c'); //gets current date in unix time format and sets as default end date.
 $alltime = true;
 
@@ -31,7 +31,7 @@ if(	isset($_GET['start'])
 } 
 
 							  
-//Creation of Connection to SF Database
+//Creation Connection to SF Database
 $mySforceConnection = new SforceEnterpriseClient();
 $mySoapClient = $mySforceConnection->createConnection(SOAP_CLIENT_BASEDIR.'/enterprise.wsdl.xml');
 $mylogin = $mySforceConnection->login($USERNAME, $PASSWORD);
@@ -39,17 +39,7 @@ $mylogin = $mySforceConnection->login($USERNAME, $PASSWORD);
 
 /////////////////  Leads Query /////////////////
 
-$leadsquery = "	SELECT 
-					LeadSource, 
-					IsConverted, 
-					CreatedDate, 
-					ConvertedOpportunity.Id, 
-					ConvertedOpportunity.CreatedDate, 
-					ConvertedOpportunity.Name, 
-					ConvertedOpportunity.StageName, 
-					ConvertedOpportunity.LeadSource  
-				FROM Lead WHERE CreatedDate >= ".$startdate." AND CreatedDate <= ".$enddate." ";
-
+$leadsquery = "SELECT LeadSource, IsConverted, CreatedDate, ConvertedOpportunity.Id, ConvertedOpportunity.CreatedDate, ConvertedOpportunity.Name, ConvertedOpportunity.StageName FROM Lead WHERE CreatedDate >= ".$startdate." AND CreatedDate <= ".$enddate." ";
 $leadsresponse = $mySforceConnection->query(($leadsquery));
 !$leaddone = false;
 
@@ -69,10 +59,10 @@ $responseConvertedOpportunitiesWon = array();
 				$responseUnconverted[] = $record->LeadSource; //Write unconverted leads to another array
 			}
 			if($record->ConvertedOpportunity){
-				$responseConvertedOpportunities[] = $record->LeadSource;				
+				$responseConvertedOpportunities[] = $record->ConvertedOpportunity;				
 			}
 			if($record->ConvertedOpportunity->StageName == "Closed Won"){
-				$responseConvertedOpportunitiesWon[] = $record->LeadSource;				
+				$responseConvertedOpportunitiesWon[] = $record->ConvertedOpportunity;				
 			}
       }
       if ($leadsresponse->done != true) {
@@ -94,54 +84,43 @@ $responseConvertedOpportunitiesWon = array();
 	//Takes unconverted list and changes NULL values to "Uncategorized".
 	$responseUnconverted = array_map( function( $v ){ return ( is_null($v) ) ? "Uncategorized" : $v; } , $responseUnconverted);
 
-	$responseConvertedOpportunities = array_map( function( $v ){ return ( is_null($v) ) ? "Uncategorized" : $v; } , $responseConvertedOpportunities);
-
-	$responseConvertedOpportunitiesWon = array_map( function( $v ){ return ( is_null($v) ) ? "Uncategorized" : $v; } , $responseConvertedOpportunitiesWon);
-
 	// Merge the two leads arrays (converted and unconverted), then count the values and give us a simple $key => $value array where $key is the lead source, and $value is the total count. 
 	$leadList = array_count_values(array_merge($responseConverted, $responseUnconverted)); 
 	$converedList = array_count_values($responseConverted);
 
-	$convertedOpportunityList = array_count_values($responseConvertedOpportunities);
-	$convertedOpportunityTotal = array_sum($convertedOpportunityList);
-
-	$convertedOpportunityWonList = array_count_values($responseConvertedOpportunitiesWon);
-	$convertedOpportunityWonTotal = array_sum($convertedOpportunityWonList);
-
-
 /////////////////  Opportunities Query /////////////////
 
-// $oppquery = "SELECT LeadSource, StageName, Id FROM Opportunity WHERE CreatedDate >= ".$startdate." AND CreatedDate <= ".$enddate." ";
-// $oppresponse = $mySforceConnection->query(($oppquery));
+$oppquery = "SELECT LeadSource, StageName, Id FROM Opportunity WHERE CreatedDate >= ".$startdate." AND CreatedDate <= ".$enddate." ";
+$oppresponse = $mySforceConnection->query(($oppquery));
 
-// //Setting up the arrays.
-// $responseOppLeadSource = array();
-// $responseOppWon = array();
+//Setting up the arrays.
+$responseOppLeadSource = array();
+$responseOppWon = array();
 
-// foreach ($oppresponse->records as $record) {
-// 		$responseOppLeadSource[] = $record->LeadSource;
-// 		if($record->StageName == 'Closed Won'){
-// 			$responseOppWon[] = $record->LeadSource;
-// 		}
-// }
-
-
-// 	// Takes list and changes NULL values to "Uncategorized".
-// 	$responseOppLeadSource = array_map( function( $v ){ return ( is_null($v) ) ? "Uncategorized" : $v; } , $responseOppLeadSource);
-
-// 	// Merge the two arrays then count the values and give us a simple $key => $value array where $key is the lead source, and $value is the total count. 
-// 	$responseOppLeadSource = array_count_values($responseOppLeadSource);
-
-// 	// Takes list and changes NULL values to "Uncategorized".
-// 	$responseOppWon = array_map( function( $v ){ return ( is_null($v) ) ? "Uncategorized" : $v; } , $responseOppWon);
-
-// 	// Merge the two arrays then count the values and give us a simple $key => $value array where $key is the lead source, and $value is the total count. 
-// 	$responseOppWon = array_count_values($responseOppWon);
-
-// 	$OppWonTotal = array_sum($responseOppWon);
+foreach ($oppresponse->records as $record) {
+		$responseOppLeadSource[] = $record->LeadSource;
+		if($record->StageName == 'Closed Won'){
+			$responseOppWon[] = $record->LeadSource;
+		}
+}
 
 
-$sourceList = array_keys(array_merge($leadList, $convertedOpportunityList, $convertedOpportunityWonList));
+	// Takes list and changes NULL values to "Uncategorized".
+	$responseOppLeadSource = array_map( function( $v ){ return ( is_null($v) ) ? "Uncategorized" : $v; } , $responseOppLeadSource);
+
+	// Merge the two arrays then count the values and give us a simple $key => $value array where $key is the lead source, and $value is the total count. 
+	$responseOppLeadSource = array_count_values($responseOppLeadSource);
+
+	// Takes list and changes NULL values to "Uncategorized".
+	$responseOppWon = array_map( function( $v ){ return ( is_null($v) ) ? "Uncategorized" : $v; } , $responseOppWon);
+
+	// Merge the two arrays then count the values and give us a simple $key => $value array where $key is the lead source, and $value is the total count. 
+	$responseOppWon = array_count_values($responseOppWon);
+
+	$OppWonTotal = array_sum($responseOppWon);
+
+
+$sourceList = array_keys(array_merge($leadList, $responseOppWon, $responseOppLeadSource));
 ?>
 
 <div class="row">
@@ -220,25 +199,25 @@ $sourceList = array_keys(array_merge($leadList, $convertedOpportunityList, $conv
 									<td>
 										<?php 
 											echo $leadList[$leadsource];
-											if($converedList[$leadsource] != ""){ echo" <small style='color:#555;font-style:italic;'>(".$converedList[$leadsource].")</small>"; } 
+											if($converedList[$leadsource] != ""){ echo" <small style='color:#ccc;font-style:italic;'>(".$converedList[$leadsource].")</small>"; } 
 										?>
 									</td>
-									<td><?php echo $convertedOpportunityList[$leadsource]; ?></td>
+									<td><?php echo $responseOppLeadSource[$leadsource]; ?></td>
 									<td><?php
-										$conversionPercentage = ($leadList[$leadsource] != 0 ? round(((($convertedOpportunityList[$leadsource])/($leadList[$leadsource]))*100), 2) : 0);
+										$conversionPercentage = ($leadList[$leadsource] != 0 ? round(((($responseOppLeadSource[$leadsource])/($leadList[$leadsource]))*100), 2) : 0);
 										echo ($conversionPercentage < 100 ? $conversionPercentage . "%" : "100%" );  ?></td>
-									<td><?php echo $convertedOpportunityWonList[$leadsource]; ?></td>
-									<td><?php echo ($convertedOpportunityWonList[$leadsource] != 0 ? round(((($convertedOpportunityWonList[$leadsource])/($convertedOpportunityList[$leadsource]))*100), 2)."%" : "0%"); ?></td>
+									<td><?php echo $responseOppWon[$leadsource]; ?></td>
+									<td><?php echo ($responseOppWon[$leadsource] != 0 ? round(((($responseOppWon[$leadsource])/($responseOppLeadSource[$leadsource]))*100), 2)."%" : "0%"); ?></td>
 								</tr> 
 								<?php
 							} ?>
 								 <tr>
 									<td><strong>TOTAL</strong></td>
 									<td><strong><?php echo $leadsresponse->size; ?></strong></td>
-									<td><strong><?php echo $convertedOpportunityTotal; ?></strong></td>
-									<td><strong><?php echo ($convertedOpportunityTotal != 0 ? round(((($convertedOpportunityTotal)/($leadsresponse->size))*100), 2)."%" : "0%"); ?></strong></td>
-									<td><strong><?php echo $convertedOpportunityWonTotal; ?></strong></td>
-									<td><strong><?php echo ($convertedOpportunityWonTotal != 0 ? round(((($convertedOpportunityWonTotal)/($convertedOpportunityTotal))*100), 2)."%" : "0%"); ?></strong></td>
+									<td><strong><?php echo $oppresponse->size; ?></strong></td>
+									<td><strong><?php echo ($oppresponse->size != 0 ? round(((($oppresponse->size)/($leadsresponse->size))*100), 2)."%" : "0%"); ?></strong></td>
+									<td><strong><?php echo $OppWonTotal; ?></strong></td>
+									<td><strong><?php echo ($OppWonTotal != 0 ? round(((($OppWonTotal)/($oppresponse->size))*100), 2)."%" : "0%"); ?></strong></td>
 								</tr> 									
 							</tbody>
 						</table>
